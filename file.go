@@ -39,6 +39,10 @@ func (driver *defaultDriver) Connect(instance store.Instance) (store.Connect, er
 		Sharding: 2000, Storage: "asset/storage",
 	}
 
+	if vv, ok := instance.Setting["storage"].(string); ok {
+		setting.Storage = vv
+	}
+
 	//分片环
 	weights := map[string]int{}
 	for i := 1; i <= setting.Sharding; i++ {
