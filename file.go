@@ -10,7 +10,7 @@ import (
 	"sync"
 
 	. "github.com/chefsgo/base"
-	"github.com/chefsgo/store"
+	"github.com/chefsgo/file"
 	"github.com/chefsgo/util"
 )
 
@@ -19,11 +19,9 @@ import (
 type (
 	defaultDriver  struct{}
 	defaultConnect struct {
-		mutex   sync.RWMutex
-		actives int64
+		mutex  sync.RWMutex
+		health file.Health
 
-		name       string
-		config     store.Config
 		setting    defaultSetting
 		sharedring *util.HashRing
 	}
@@ -34,7 +32,7 @@ type (
 )
 
 //连接
-func (driver *defaultDriver) Connect(name string, config store.Config) (store.Connect, error) {
+func (driver *defaultDriver) Connect(instance file.Instance) (file.Connect, error) {
 	if config.Cache == "" {
 		config.Cache = os.TempDir()
 	}
@@ -61,10 +59,10 @@ func (connect *defaultConnect) Open() error {
 	return nil
 }
 
-func (connect *defaultConnect) Health() (store.Health, error) {
+func (connect *defaultConnect) Health() file.Health {
 	connect.mutex.RLock()
 	defer connect.mutex.RUnlock()
-	return store.Health{Workload: connect.actives}, nil
+	return connect.health
 }
 
 //关闭连接
@@ -72,7 +70,7 @@ func (connect *defaultConnect) Close() error {
 	return nil
 }
 
-func (connect *defaultConnect) Upload(target string, metadata Map) (store.File, store.Files, error) {
+func (connect *defaultConnect) Upload(target string, metadata Map) (file.File, file.Files, error) {
 	stat, err := os.Stat(target)
 	if err != nil {
 		return nil, nil, err
@@ -86,17 +84,17 @@ func (connect *defaultConnect) Upload(target string, metadata Map) (store.File, 
 			return nil, nil, err
 		}
 
-		files := store.Files{}
+		files := file.Files{}
 		for _, file := range dirs {
 			if !file.IsDir() {
 
 				source := path.Join(target, file.Name())
-				hash := store.Hash(source)
+				hash := file.Hash(source)
 				if hash == "" {
 					return nil, nil, errors.New("hash error")
 				}
 
-				file := store.NewFile(connect.name, hash, source, file.Size())
+				file := file.NewFile(connect.name, hash, source, file.Size())
 
 				err := connect.storage(source, file)
 				if err != nil {
@@ -111,12 +109,12 @@ func (connect *defaultConnect) Upload(target string, metadata Map) (store.File, 
 
 	} else {
 
-		hash := store.Hash(target)
+		hash := file.Hash(target)
 		if hash == "" {
 			return nil, nil, errors.New("hash error")
 		}
 
-		file := store.NewFile(connect.name, hash, target, stat.Size())
+		file := file.NewFile(connect.name, hash, target, stat.Size())
 
 		err := connect.storage(target, file)
 		if err != nil {
@@ -127,7 +125,7 @@ func (connect *defaultConnect) Upload(target string, metadata Map) (store.File, 
 	}
 }
 
-func (connect *defaultConnect) Download(file store.File) (string, error) {
+func (connect *defaultConnect) Download(file file.File) (string, error) {
 	///直接返回本地文件存储
 	_, _, sFile, err := connect.storaging(file)
 	if err != nil {
@@ -136,7 +134,7 @@ func (connect *defaultConnect) Download(file store.File) (string, error) {
 	return sFile, nil
 }
 
-func (connect *defaultConnect) Remove(file store.File) error {
+func (connect *defaultConnect) Remove(file file.File) error {
 	_, _, sFile, err := connect.storaging(file)
 	if err != nil {
 		return err
@@ -145,17 +143,17 @@ func (connect *defaultConnect) Remove(file store.File) error {
 	return os.Remove(sFile)
 }
 
-// func (connect *defaultConnect) Browse(file store.File, name string, expiries ...time.Duration) (string, error) {
+// func (connect *defaultConnect) Browse(file file.File, name string, expiries ...time.Duration) (string, error) {
 // 	return argo.Browse(file.Code(), name, expiries...), nil
 // }
 
-// func (connect *defaultConnect) Preview(file store.File, w, h, t int64, expiries ...time.Duration) (string, error) {
+// func (connect *defaultConnect) Preview(file file.File, w, h, t int64, expiries ...time.Duration) (string, error) {
 // 	return argo.Preview(file.Code(), w, h, t, expiries...), nil
 // }
 
 //-------------------- defaultBase end -------------------------
 
-func (connect *defaultConnect) storage(source string, coding store.File) error {
+func (connect *defaultConnect) storage(source string, coding file.File) error {
 	_, _, sFile, err := connect.storaging(coding)
 	if err != nil {
 		return err
@@ -189,7 +187,7 @@ func (connect *defaultConnect) storage(source string, coding store.File) error {
 	return nil
 }
 
-func (connect *defaultConnect) storaging(file store.File) (string, string, string, error) {
+func (connect *defaultConnect) storaging(file file.File) (string, string, string, error) {
 	if ring := connect.sharedring.Locate(file.Hash()); ring != "" {
 
 		full := file.Hash()

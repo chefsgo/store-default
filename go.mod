@@ -1,4 +1,4 @@
-module github.com/chefsgo/store-default
+module github.com/chefsgo/file-default
 
 go 1.17
 
