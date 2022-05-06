@@ -1,13 +1,13 @@
-package file_default
+package store_default
 
 import (
-	"github.com/chefsgo/file"
+	"github.com/chefsgo/store"
 )
 
-func Driver() file.Driver {
+func Driver() store.Driver {
 	return &defaultDriver{}
 }
 
 func init() {
-	file.Register("default", Driver())
+	store.Register("default", Driver())
 }
