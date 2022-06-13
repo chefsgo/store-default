@@ -36,7 +36,7 @@ type (
 //连接
 func (driver *defaultDriver) Connect(instance store.Instance) (store.Connect, error) {
 	setting := defaultSetting{
-		Sharding: 2000, Storage: "asset/storage",
+		Sharding: 2000, Storage: "store/storage",
 	}
 
 	if vv, ok := instance.Setting["storage"].(string); ok {
